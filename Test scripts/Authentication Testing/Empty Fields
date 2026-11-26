@@ -1,0 +1,61 @@
+const { Builder, By } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function waitForVisibleText(driver, locator, timeout = 10000) {
+  return driver.wait(
+    async () => {
+      try {
+        let el = await driver.findElement(locator);
+        if (!(await el.isDisplayed())) return false;
+        let text = (await el.getText()).trim();
+        return text.length > 0 ? text : false;
+      } catch (err) {
+        if (
+          err.name === "StaleElementReferenceError" ||
+          err.name === "NoSuchElementError"
+        ) {
+          return false;
+        }
+        throw err;
+      }
+    },
+    timeout,
+    `Timed out waiting for visible text on ${locator}`,
+  );
+}
+
+async function emptyFieldsTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  let alertLocator = By.css(".alert.alert-danger");
+
+  try {
+    await driver.get("http://localhost/ospos/public/login");
+
+    await driver.findElement(By.id("submit-button")).click();
+
+    let usernameError = await waitForVisibleText(driver, alertLocator);
+    assert.strictEqual(
+      usernameError,
+      "The username field is required.",
+      "Username required message mismatch!",
+    );
+
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("submit-button")).click();
+
+    let passwordError = await waitForVisibleText(driver, alertLocator);
+    let expectedPasswordText = "The username field is required.";
+
+    assert.strictEqual(
+      passwordError,
+      expectedPasswordText,
+      `Password/empty-field message mismatch! Got: "${passwordError}"`,
+    );
+
+    console.log("Empty fields assertions passed!");
+  } finally {
+    await driver.quit();
+  }
+}
+
+emptyFieldsTest();

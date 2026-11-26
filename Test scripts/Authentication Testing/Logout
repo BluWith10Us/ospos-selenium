@@ -1,0 +1,41 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function authTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+
+    let submitBtn = await driver.findElement(By.id("submit-button"));
+    await submitBtn.click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login");
+      },
+      10000,
+      "Login did not redirect away from /login",
+    );
+
+    let logoutLocator = By.xpath(
+      "//a[contains(@href, 'logout') or normalize-space()='Logout'] | //button[contains(@id, 'logout') or contains(@href, 'logout') or normalize-space()='Logout']",
+    );
+
+    let logoutBtn = await driver.wait(
+      until.elementLocated(logoutLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(logoutBtn), 10000);
+    await logoutBtn.click();
+
+    await driver.wait(until.urlContains("/login"), 10000);
+    console.log("Logout verified!");
+  } finally {
+    await driver.quit();
+  }
+}
+
+authTest();

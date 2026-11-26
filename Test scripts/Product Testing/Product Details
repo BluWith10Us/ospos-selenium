@@ -1,0 +1,82 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function productDetailsTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    //Navigate to Items list
+    let itemsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/items'], a[href$='/items']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(itemsLink), 10000);
+    await itemsLink.click();
+    await driver.wait(until.urlContains("/items"), 10000);
+
+    //Click the Inventory Count Details link for item 1
+    let detailsLocator = By.css(
+      "a[href='http://localhost/ospos/public/items/countDetails/1'], a[href$='/items/countDetails/1'], a.modal-dlg[title='Inventory Count Details']",
+    );
+    let detailsLink = await driver.wait(
+      until.elementLocated(detailsLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(detailsLink), 10000);
+    await driver.executeScript(
+      "arguments[0].scrollIntoView({block: 'center'});",
+      detailsLink,
+    );
+    await detailsLink.click();
+
+    // 4. Verify the Inventory Count Details modal or page opens
+    let modalOrDetails = await driver.wait(
+      async () => {
+        let candidates = await driver.findElements(
+          By.css(".modal.in, .modal.show, .bootstrap-dialog, .modal-content"),
+        );
+        for (let el of candidates) {
+          if (await el.isDisplayed()) {
+            return el;
+          }
+        }
+        let url = await driver.getCurrentUrl();
+        if (url.includes("/items/countDetails/1")) {
+          return await driver.findElement(By.css("body"));
+        }
+        return false;
+      },
+      10000,
+      "Inventory Count Details modal or page did not open",
+    );
+
+    assert.ok(modalOrDetails, "Product/inventory details view did not appear");
+    console.log("Inventory Count Details opened successfully!");
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+productDetailsTest();

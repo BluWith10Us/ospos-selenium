@@ -1,0 +1,53 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function invalidLogin() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("faileduser");
+    await driver
+      .findElement(By.id("input-password"))
+      .sendKeys("failedpassword");
+    await driver.findElement(By.id("submit-button")).click();
+
+    let alertLocator = By.css(".alert.alert-danger");
+
+    let actualText = await driver.wait(
+      async () => {
+        try {
+          let el = await driver.findElement(alertLocator);
+          let visible = await el.isDisplayed();
+          if (!visible) return false;
+          let text = (await el.getText()).trim();
+          return text.length > 0 ? text : false;
+        } catch (err) {
+          if (
+            err.name === "StaleElementReferenceError" ||
+            err.name === "NoSuchElementError"
+          ) {
+            return false;
+          }
+          throw err;
+        }
+      },
+      10000,
+      "Timed out waiting for visible error alert",
+    );
+
+    let expectedText = "Invalid username and/or password.";
+    assert.strictEqual(actualText, expectedText, "Text mismatch!");
+
+    let currentUrl = await driver.getCurrentUrl();
+    assert.ok(
+      currentUrl.includes("/login"),
+      "Unexpectedly navigated away from login page",
+    );
+
+    console.log("Assertion passed!");
+  } finally {
+    await driver.quit();
+  }
+}
+
+invalidLogin();

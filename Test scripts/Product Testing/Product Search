@@ -1,0 +1,87 @@
+const { Builder, By, Key, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function searchProductTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    //Nav
+    let itemsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/items'], a[href$='/items']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(itemsLink), 10000);
+    await itemsLink.click();
+    await driver.wait(until.urlContains("/items"), 10000);
+
+    let searchInput = await driver.wait(
+      until.elementLocated(
+        By.css(
+          ".fixed-table-toolbar .search input, input[type='search'], input[placeholder*='Search']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(searchInput), 10000);
+    await searchInput.clear();
+    await searchInput.sendKeys("Obi Wan", Key.RETURN);
+
+    let matchingRowText = await driver.wait(
+      async () => {
+        try {
+          let rows = await driver.findElements(By.css("table tbody tr"));
+          for (let row of rows) {
+            let text = (await row.getText()).trim();
+            if (
+              text.toLowerCase().includes("obi wan") &&
+              text.toLowerCase().includes("rod")
+            ) {
+              return text;
+            }
+          }
+          return false;
+        } catch (err) {
+          if (err.name === "StaleElementReferenceError") {
+            return false;
+          }
+          throw err;
+        }
+      },
+      10000,
+      "Could not find 'Obi Wan's magic rod' in search results",
+    );
+
+    assert.ok(
+      matchingRowText.toLowerCase().includes("obi wan"),
+      `Expected matching product in results, got: "${matchingRowText}"`,
+    );
+
+    console.log("Search passed! Found row:", matchingRowText);
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+searchProductTest();

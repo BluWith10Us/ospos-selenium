@@ -1,0 +1,46 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function authTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+
+    let submitBtn = await driver.findElement(By.id("submit-button"));
+    await submitBtn.click();
+
+    // checks navigation away from /login
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login");
+      },
+      10000,
+      "Did not navigate away from login page",
+    );
+
+    let heading = await driver.wait(
+      until.elementLocated(
+        By.xpath(
+          "//h3[contains(@class, 'text-center') and contains(., 'Welcome to OSPOS')]",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(heading), 10000);
+
+    let actualText = (await heading.getText()).trim();
+    assert.ok(
+      actualText.includes("Welcome to OSPOS"),
+      `Unexpected welcome text: "${actualText}"`,
+    );
+
+    console.log("Login verified! Current URL:", await driver.getCurrentUrl());
+  } finally {
+    await driver.quit();
+  }
+}
+
+authTest();
