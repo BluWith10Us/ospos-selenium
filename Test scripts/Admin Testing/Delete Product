@@ -1,0 +1,65 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function addProductTest(){
+    let driver = await new Builder().forBrowser("chrome").build();
+    try{
+        await driver.get("http://localhost/ospos/public/login");
+        await driver.findElement(By.id("input-username")).sendKeys("admin");
+        await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+        await driver.findElement(By.id("submit-button")).click();
+
+        await driver.wait(
+        async () => {
+            let url = await driver.getCurrentUrl();
+            return !url.includes("/login") && url.includes("/home");
+        },
+        10000,
+        "Did not reach the home page",
+        );
+
+        let itemsLink = await driver.wait(
+            until.elementLocated(
+                By.css(
+                    "a[href='http://localhost/ospos/public/items'], a[href$='/items']",
+                ),
+            ),
+            10000,
+        )
+        await driver.wait(until.elementIsVisible(itemsLink), 10000);
+        await itemsLink.click();
+        await driver.wait(until.urlContains("/items"), 10000);
+
+        let selectBoxLocator = By.css(
+            "tr[data-uniqueid='1']",
+        );
+
+        let selectBox = await driver.wait(
+            until.elementLocated(selectBoxLocator),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(selectBox), 10000);
+        await selectBox.click();
+
+        let deleteItemBtn = await driver.wait(
+            until.elementLocated(By.css("button[id='delete']")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(deleteItemBtn), 10000);
+        await deleteItemBtn.click(10000);
+
+        let alert = await driver.switchTo().alert();
+        //let alertText = await alert.getText();
+        await alert.accept();
+    }
+    finally {
+        try {
+        let handles = await driver.getAllWindowHandles();
+            if (handles.length > 0) {
+                await driver.quit();
+            }
+        } catch (_) {}
+    }   
+}
+
+addProductTest();

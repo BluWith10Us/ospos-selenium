@@ -1,0 +1,102 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function SubmitCheckoutCartTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    //Log in again
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    //Navigate to Sales
+    let receivingsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/sales'], a[href$='/sales']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(receivingsLink), 10000);
+    await receivingsLink.click();
+    await driver.wait(until.urlContains("/sales"), 10000);
+
+    // input item
+    let itemInput = await driver.wait(
+      until.elementLocated(By.id("item")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(itemInput), 10000);
+    await itemInput.click();
+    await itemInput.clear();
+    await itemInput.sendKeys("Obi Wan's magic rod");
+
+    // select the item from the autocomplete suggestions
+    let autocompleteOptionLocator = By.xpath(
+      "//ul[contains(@class, 'ui-autocomplete')]//li//a[contains(., \"Obi Wan's magic rod\")] | //ul[contains(@class, 'ui-autocomplete')]//li[contains(., \"Obi Wan's magic rod\")]",
+    );
+    let autocompleteOption = await driver.wait(
+      until.elementLocated(autocompleteOptionLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(autocompleteOption), 10000);
+    await autocompleteOption.click();
+
+    console.log("Item added to checkout cart successfully");
+
+    let customerIDInput = await driver.wait(
+      until.elementLocated(By.id("customer")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(customerIDInput), 10000);
+    await customerIDInput.click();
+    await customerIDInput.clear();
+    await customerIDInput.sendKeys("Azzy Pazzy");
+
+    autocompleteOptionLocator = By.xpath(
+      "//ul[contains(@class, 'ui-autocomplete')]//li//a[contains(., \"Azzy Pazzy\")] | //ul[contains(@class, 'ui-autocomplete')]//li[contains(., \"Azzy Pazzy\")]",
+    );
+    autocompleteOption = await driver.wait(
+      until.elementLocated(autocompleteOptionLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(autocompleteOption), 10000);
+    await autocompleteOption.click();
+
+    let paymentBtn = await driver.wait(
+      until.elementLocated(By.id("add_payment_button")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(paymentBtn), 10000);
+    await paymentBtn.click();
+
+    let submitBtn = await driver.wait(
+      until.elementLocated(By.id("finish_sale_button")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(submitBtn), 10000);
+    await submitBtn.click();
+
+
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+SubmitCheckoutCartTest();

@@ -1,0 +1,142 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function addProductTest(){
+    let driver = await new Builder().forBrowser("chrome").build();
+    try{
+        await driver.get("http://localhost/ospos/public/login");
+        await driver.findElement(By.id("input-username")).sendKeys("admin");
+        await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+        await driver.findElement(By.id("submit-button")).click();
+
+        await driver.wait(
+        async () => {
+            let url = await driver.getCurrentUrl();
+            return !url.includes("/login") && url.includes("/home");
+        },
+        10000,
+        "Did not reach the home page",
+        );
+
+        let itemsLink = await driver.wait(
+            until.elementLocated(
+                By.css(
+                    "a[href='http://localhost/ospos/public/items'], a[href$='/items']",
+                ),
+            ),
+            10000,
+        )
+        await driver.wait(until.elementIsVisible(itemsLink), 10000);
+        await itemsLink.click();
+        await driver.wait(until.urlContains("/items"), 10000);
+
+        let addItemLocator = By.css(
+            "button.modal-dlg[data-href*='items/view'], button[title='New Item']",
+        );
+
+        let addItemBtn = await driver.wait(
+            until.elementLocated(addItemLocator),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(addItemBtn), 10000);
+        await addItemBtn.click();
+
+        let barcode = "69696969694204204204204201337";
+        let itemName = "Hello Panda Strawberry 30g";
+        let itemCategory = "Foodstuffs";
+        let priceWholesale = "0.9";
+        let priceRetail = "1.5";
+        let quantity = "24";
+        let receivingQuantity = "100";
+        let description = "mmphhghghggmpehg.... strobir.y...."
+
+        let barcodeInput = await driver.wait(
+            until.elementLocated(By.id("item_number")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(barcodeInput), 10000);
+        await barcodeInput.click();
+        await barcodeInput.clear();
+        await barcodeInput.sendKeys(barcode);
+
+        let nameInput = await driver.wait(
+            until.elementLocated(By.id("name")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(nameInput), 10000);
+        await nameInput.click();
+        await nameInput.clear();
+        await nameInput.sendKeys(itemName);
+
+        let categoryInput = await driver.wait(
+            until.elementLocated(By.id("category")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(categoryInput), 10000);
+        await categoryInput.click();
+        await categoryInput.clear();
+        await categoryInput.sendKeys(itemCategory);
+
+        let wholesaleInput = await driver.wait(
+            until.elementLocated(By.id("cost_price")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(wholesaleInput), 10000);
+        await wholesaleInput.click();
+        await wholesaleInput.clear();
+        await wholesaleInput.sendKeys(priceWholesale);
+
+        let retailInput = await driver.wait(
+            until.elementLocated(By.id("unit_price")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(retailInput), 10000);
+        await retailInput.click();
+        await retailInput.clear();
+        await retailInput.sendKeys(priceRetail);
+
+        let quantityInput = await driver.wait(
+            until.elementLocated(By.id("quantity_1")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(quantityInput), 10000);
+        await quantityInput.click();
+        await quantityInput.clear();
+        await quantityInput.sendKeys(quantity);
+
+        let receivingQuantityInput = await driver.wait(
+            until.elementLocated(By.id("receiving_quantity")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(receivingQuantityInput), 10000);
+        await receivingQuantityInput.click();
+        await receivingQuantityInput.clear();
+        await receivingQuantityInput.sendKeys(receivingQuantity);
+
+        let descriptionInput = await driver.wait(
+            until.elementLocated(By.id("description")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(descriptionInput), 10000);
+        await descriptionInput.click();
+        await descriptionInput.clear();
+        await descriptionInput.sendKeys(description);
+
+        let submitBtn = await driver.wait(
+            until.elementLocated(By.id("submit")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(submitBtn), 10000);
+        await submitBtn.click();
+    }
+    finally {
+        try {
+        let handles = await driver.getAllWindowHandles();
+            if (handles.length > 0) {
+                await driver.quit();
+            }
+        } catch (_) {}
+    }   
+}
+
+addProductTest();
