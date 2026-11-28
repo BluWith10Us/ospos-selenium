@@ -1,0 +1,73 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function addProductTest(){
+    let driver = await new Builder().forBrowser("chrome").build();
+    try{
+        await driver.get("http://localhost/ospos/public/login");
+        await driver.findElement(By.id("input-username")).sendKeys("admin");
+        await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+        await driver.findElement(By.id("submit-button")).click();
+
+        await driver.wait(
+        async () => {
+            let url = await driver.getCurrentUrl();
+            return !url.includes("/login") && url.includes("/home");
+        },
+        10000,
+        "Did not reach the home page",
+        );
+
+        let itemsLink = await driver.wait(
+            until.elementLocated(
+                By.css(
+                    "a[href='http://localhost/ospos/public/items'], a[href$='/items']",
+                ),
+            ),
+            10000,
+        )
+        await driver.wait(until.elementIsVisible(itemsLink), 10000);
+        await itemsLink.click();
+        await driver.wait(until.urlContains("/items"), 10000);
+
+        // edit item
+        let editItemLocator = By.css(
+            "a[href*='http://localhost/ospos/public/items/view/1'], a.modal-dlg[title='Update Item']",
+        );
+
+        let editItemBtn = await driver.wait(
+            until.elementLocated(editItemLocator),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(editItemBtn), 10000);
+        await editItemBtn.click();
+
+        let barcode = "1337";
+
+        let barcodeInput = await driver.wait(
+            until.elementLocated(By.id("item_number")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(barcodeInput), 10000);
+        await barcodeInput.click();
+        await barcodeInput.clear();
+        await barcodeInput.sendKeys(barcode);
+
+        let submitBtn = await driver.wait(
+            until.elementLocated(By.css("button[id='submit']")),
+            10000,
+        );
+        await driver.wait(until.elementIsVisible(submitBtn), 10000);
+        await submitBtn.click();
+    }
+    finally {
+        try {
+        let handles = await driver.getAllWindowHandles();
+            if (handles.length > 0) {
+                await driver.quit();
+            }
+        } catch (_) {}
+    }   
+}
+
+addProductTest();
