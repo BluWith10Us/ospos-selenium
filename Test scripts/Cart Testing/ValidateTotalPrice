@@ -1,0 +1,134 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function validateTotalPrice() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    // Log in
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    // Navigate to Receivings
+    let receivingsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/receivings'], a[href$='/receivings']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(receivingsLink), 10000);
+    await receivingsLink.click();
+    await driver.wait(until.urlContains("/receivings"), 10000);
+
+    function xpathLiteral(str) {
+      if (!str.includes("'")) {
+        return `'${str}'`;
+      }
+      const parts = str.split("'");
+      return (
+        "concat(" +
+        parts
+          .map((part, idx) => (idx === 0 ? `'${part}'` : `"'", '${part}'`))
+          .join(", ") +
+        ")"
+      );
+    }
+
+    async function addItemToCart(driver, itemName) {
+      let itemInput = await driver.wait(
+        until.elementLocated(By.id("item")),
+        10000,
+      );
+      await driver.wait(until.elementIsVisible(itemInput), 10000);
+      await itemInput.click();
+      await itemInput.clear();
+      await itemInput.sendKeys(itemName);
+
+      const lowerTarget = itemName.toLowerCase();
+      const safeLowerLiteral = xpathLiteral(lowerTarget);
+
+      const optionLocator = By.xpath(
+        `//ul[contains(@class, 'ui-autocomplete')]//li//a[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), ${safeLowerLiteral})] | //ul[contains(@class, 'ui-autocomplete')]//li[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), ${safeLowerLiteral})]`,
+      );
+
+      let option = await driver.wait(
+        until.elementLocated(optionLocator),
+        10000,
+      );
+      await driver.wait(until.elementIsVisible(option), 10000);
+      await option.click();
+
+      const cellLocator = By.xpath(
+        `//td[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), ${safeLowerLiteral})]`,
+      );
+
+      let cell = await driver.wait(until.elementLocated(cellLocator), 10000);
+      await driver.wait(until.elementIsVisible(cell), 10000);
+      console.log(`Added to cart: ${itemName}`);
+    }
+
+    // Add all four items (passing `driver` as the first argument)
+    await addItemToCart(driver, "Obi Wan's magic rod");
+    await addItemToCart(driver, "LED Desk Lamp");
+    await addItemToCart(driver, "Sparkling Water Lemon 330ml");
+    await addItemToCart(driver, "Bottled Water 500ml");
+
+    // Wait for and validate the total price cell ($19.20)
+    let expectedTotal = "$19.20";
+    let totalLocator = By.xpath(
+      "//th[contains(@style, 'text-align: right') and normalize-space()='$19.20']",
+    );
+
+    let actualTotal = await driver.wait(
+      async () => {
+        try {
+          let totalEl = await driver.findElement(totalLocator);
+          if (!(await totalEl.isDisplayed())) {
+            return false;
+          }
+          let text = (await totalEl.getText()).trim();
+          return text === expectedTotal ? text : false;
+        } catch (err) {
+          if (
+            err.name === "StaleElementReferenceError" ||
+            err.name === "NoSuchElementError"
+          ) {
+            return false;
+          }
+          throw err;
+        }
+      },
+      10000,
+      `Expected total price "${expectedTotal}" did not appear`,
+    );
+
+    assert.strictEqual(
+      actualTotal,
+      expectedTotal,
+      `Expected total "${expectedTotal}", got "${actualTotal}"`,
+    );
+
+    console.log("Total price validated successfully:", actualTotal);
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+validateTotalPrice();

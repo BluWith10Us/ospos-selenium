@@ -1,0 +1,84 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function addItemToReceivingCartTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    //Log in again
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    //Navigate to Receivings
+    let receivingsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/receivings'], a[href$='/receivings']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(receivingsLink), 10000);
+    await receivingsLink.click();
+    await driver.wait(until.urlContains("/receivings"), 10000);
+
+    // input item
+    let itemInput = await driver.wait(
+      until.elementLocated(By.id("item")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(itemInput), 10000);
+    await itemInput.click();
+    await itemInput.clear();
+    await itemInput.sendKeys("Obi Wan's magic rod");
+
+    // select the item from the autocomplete suggestions
+    let autocompleteOptionLocator = By.xpath(
+      "//ul[contains(@class, 'ui-autocomplete')]//li//a[contains(., \"Obi Wan's magic rod\")] | //ul[contains(@class, 'ui-autocomplete')]//li[contains(., \"Obi Wan's magic rod\")]",
+    );
+    let autocompleteOption = await driver.wait(
+      until.elementLocated(autocompleteOptionLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(autocompleteOption), 10000);
+    await autocompleteOption.click();
+
+    //check if item appreas
+    let cartCellLocator = By.xpath(
+      "//td[contains(., \"Obi Wan's magic rod\") and contains(., '[13 in stock]')]",
+    );
+    let cartCell = await driver.wait(
+      until.elementLocated(cartCellLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(cartCell), 10000);
+
+    let cellText = (await cartCell.getText()).trim();
+    assert.ok(
+      cellText.includes("Obi Wan's magic rod") &&
+        cellText.includes("[13 in stock]"),
+      `Unexpected cart cell text: "${cellText}"`,
+    );
+
+    console.log("Item added to receiving cart successfully:", cellText);
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+addItemToReceivingCartTest();

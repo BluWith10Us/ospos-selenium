@@ -1,0 +1,133 @@
+const { Builder, By, Key, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function addNewGiftCardTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    // Log in
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    // Navigate to Gift Cards
+    let giftCardsLocator = By.css(
+      "a[href='http://localhost/ospos/public/giftcards'], a[href$='/giftcards']",
+    );
+    let giftCardsLink = await driver.wait(
+      until.elementLocated(giftCardsLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(giftCardsLink), 10000);
+    await giftCardsLink.click();
+    await driver.wait(until.urlContains("/giftcards"), 10000);
+
+    // Open the "New Gift Card" modal
+    let newGiftCardLocator = By.css(
+      "button.modal-dlg[data-href*='giftcards/view'], button[title='New Gift Card']",
+    );
+    let newGiftCardBtn = await driver.wait(
+      until.elementLocated(newGiftCardLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(newGiftCardBtn), 10000);
+    await newGiftCardBtn.click();
+
+    // Fill out person_name, giftcard_number, and giftcard_amount inside the modal
+    let personName = "Obi Wan Kenobi";
+    let giftcardNumber = "8801";
+    let giftcardAmount = "50.00";
+
+    let nameInput = await driver.wait(
+      until.elementLocated(By.id("person_name")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(nameInput), 10000);
+    await nameInput.click();
+    await nameInput.clear();
+    await nameInput.sendKeys(personName);
+
+    // Select matching autocomplete suggestion if one pops up for person_name
+    let autocompleteOptions = await driver.findElements(
+      By.css("ul.ui-autocomplete li.ui-menu-item"),
+    );
+    for (let opt of autocompleteOptions) {
+      if (await opt.isDisplayed()) {
+        let text = (await opt.getText()).trim();
+        if (text.toLowerCase().includes(personName.toLowerCase())) {
+          await opt.click();
+          break;
+        }
+      }
+    }
+
+    let numberInput = await driver.wait(
+      until.elementLocated(By.id("giftcard_number")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(numberInput), 10000);
+    await numberInput.click();
+    await numberInput.sendKeys(Key.chord(Key.CONTROL, "a"), giftcardNumber);
+
+    let amountInput = await driver.wait(
+      until.elementLocated(By.id("giftcard_amount")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(amountInput), 10000);
+    await amountInput.click();
+    await amountInput.sendKeys(Key.chord(Key.CONTROL, "a"), giftcardAmount);
+
+    // Click the modal Submit button (BootstrapDialog footer button)
+    let submitModalLocator = By.xpath(
+      "//div[contains(@class, 'modal') and (contains(@class, 'in') or contains(@class, 'show'))]//button[normalize-space()='Submit' or contains(@class, 'btn-primary')]",
+    );
+    let submitModalBtn = await driver.wait(
+      until.elementLocated(submitModalLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(submitModalBtn), 10000);
+    await submitModalBtn.click();
+
+    // Wait for modal to close and verify the new gift card appears in the table
+    await driver.wait(
+      async () => {
+        try {
+          let bodyText = await driver.findElement(By.css("body")).getText();
+          return (
+            bodyText.includes(giftcardNumber) ||
+            bodyText.toLowerCase().includes(personName.toLowerCase())
+          );
+        } catch (err) {
+          if (err.name === "StaleElementReferenceError") {
+            return false;
+          }
+          throw err;
+        }
+      },
+      10000,
+      "New gift card did not appear after submitting",
+    );
+
+    console.log(
+      `Gift card created successfully! Number: ${giftcardNumber}, Amount: $${giftcardAmount}`,
+    );
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+addNewGiftCardTest();

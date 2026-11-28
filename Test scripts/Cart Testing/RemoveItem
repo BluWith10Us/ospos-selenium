@@ -1,0 +1,121 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function addAndRemoveReceivingItemsTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    // Log in
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    // Navigate to Receivings
+    let receivingsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/receivings'], a[href$='/receivings']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(receivingsLink), 10000);
+    await receivingsLink.click();
+    await driver.wait(until.urlContains("/receivings"), 10000);
+
+    // Helper function to add an item via the #item autocomplete field
+    async function addItem(itemName) {
+      let itemInput = await driver.wait(
+        until.elementLocated(By.id("item")),
+        10000,
+      );
+      await driver.wait(until.elementIsVisible(itemInput), 10000);
+      await itemInput.click();
+      await itemInput.clear();
+      await itemInput.sendKeys(itemName);
+
+      let optionLocator = By.xpath(
+        `//ul[contains(@class, 'ui-autocomplete')]//li//a[contains(., "${itemName}")] | //ul[contains(@class, 'ui-autocomplete')]//li[contains(., "${itemName}")]`,
+      );
+      let option = await driver.wait(
+        until.elementLocated(optionLocator),
+        10000,
+      );
+      await driver.wait(until.elementIsVisible(option), 10000);
+      await option.click();
+
+      let cellLocator = By.xpath(`//td[contains(., "${itemName}")]`);
+      let cell = await driver.wait(until.elementLocated(cellLocator), 10000);
+      await driver.wait(until.elementIsVisible(cell), 10000);
+    }
+
+    // add rod and water
+    await addItem("Obi Wan's magic rod");
+    console.log("Added: Obi Wan's magic rod");
+
+    await addItem("Bottled Water 500ml");
+    console.log("Added: Bottled Water 500ml");
+
+    // find remove item button
+    let removeWandLocator = By.xpath(
+      "//tr[.//td[contains(., \"Obi Wan's magic rod\")]]//a[contains(@href, 'delete_item') or contains(@class, 'delete_item') or @title='Delete' or .//span[contains(@class, 'glyphicon-trash')]]",
+    );
+    let removeWandBtn = await driver.wait(
+      until.elementLocated(removeWandLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(removeWandBtn), 10000);
+    await removeWandBtn.click();
+
+    // check after wand is removed
+    await driver.wait(
+      async () => {
+        try {
+          let wandCells = await driver.findElements(
+            By.xpath('//td[contains(., "Obi Wan\'s magic rod")]'),
+          );
+          return wandCells.length === 0;
+        } catch (err) {
+          if (err.name === "StaleElementReferenceError") {
+            return false;
+          }
+          throw err;
+        }
+      },
+      10000,
+      "Obi Wan's magic rod was not removed from the cart",
+    );
+
+    // verify if the water bottle remains
+    let remainingWaterCells = await driver.findElements(
+      By.xpath("//td[contains(., 'Bottled Water 500ml')]"),
+    );
+    assert.strictEqual(
+      remainingWaterCells.length,
+      1,
+      "Expected 'Bottled Water 500ml' to still be in the receiving cart",
+    );
+
+    console.log(
+      "Remove item test passed! 'Obi Wan's magic rod' removed, 'Bottled Water 500ml' still in cart.",
+    );
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+addAndRemoveReceivingItemsTest();

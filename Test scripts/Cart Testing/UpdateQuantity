@@ -1,0 +1,111 @@
+const { Builder, By, Key, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function updateReceivingQuantityTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    // Log in again
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    // Navigate to Receivings
+    let receivingsLink = await driver.wait(
+      until.elementLocated(
+        By.css(
+          "a[href='http://localhost/ospos/public/receivings'], a[href$='/receivings']",
+        ),
+      ),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(receivingsLink), 10000);
+    await receivingsLink.click();
+    await driver.wait(until.urlContains("/receivings"), 10000);
+
+    // input item
+    let itemInput = await driver.wait(
+      until.elementLocated(By.id("item")),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(itemInput), 10000);
+    await itemInput.click();
+    await itemInput.clear();
+    await itemInput.sendKeys("Obi Wan's magic rod");
+
+    let autocompleteOptionLocator = By.xpath(
+      "//ul[contains(@class, 'ui-autocomplete')]//li//a[contains(., \"Obi Wan's magic rod\")] | //ul[contains(@class, 'ui-autocomplete')]//li[contains(., \"Obi Wan's magic rod\")]",
+    );
+    let autocompleteOption = await driver.wait(
+      until.elementLocated(autocompleteOptionLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(autocompleteOption), 10000);
+    await autocompleteOption.click();
+
+    let cartCellLocator = By.xpath('//td[contains(., "Obi Wan\'s magic rod")]');
+    await driver.wait(until.elementLocated(cartCellLocator), 10000);
+
+    // Update the quantity of the item in the receiving cart
+    let newQuantity = "5";
+    let quantityLocator = By.css("input[name='quantity']");
+
+    await driver.wait(
+      async () => {
+        try {
+          let qtyInput = await driver.findElement(quantityLocator);
+          if (!(await qtyInput.isDisplayed())) {
+            return false;
+          }
+          await qtyInput.click();
+          await qtyInput.sendKeys(
+            Key.chord(Key.CONTROL, "a"),
+            newQuantity,
+            Key.RETURN,
+          );
+
+          // Re-query and check updated value after form/AJAX refresh
+          let updatedInput = await driver.findElement(quantityLocator);
+          let currentVal = await updatedInput.getAttribute("value");
+          return currentVal === newQuantity;
+        } catch (err) {
+          if (err.name === "StaleElementReferenceError") {
+            return false;
+          }
+          throw err;
+        }
+      },
+      10000,
+      `Failed to update quantity to ${newQuantity}`,
+    );
+
+    let finalQty = await driver
+      .findElement(quantityLocator)
+      .getAttribute("value");
+    assert.strictEqual(
+      finalQty,
+      newQuantity,
+      `Expected quantity "${newQuantity}", got "${finalQty}"`,
+    );
+
+    console.log("Quantity updated successfully to:", finalQty);
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+updateReceivingQuantityTest();

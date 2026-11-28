@@ -1,0 +1,84 @@
+const { Builder, By, until } = require("selenium-webdriver");
+const assert = require("assert");
+
+async function navigateToGiftCardsTest() {
+  let driver = await new Builder().forBrowser("chrome").build();
+  try {
+    // Login
+    await driver.get("http://localhost/ospos/public/login");
+    await driver.findElement(By.id("input-username")).sendKeys("admin");
+    await driver.findElement(By.id("input-password")).sendKeys("pointofsale");
+    await driver.findElement(By.id("submit-button")).click();
+
+    await driver.wait(
+      async () => {
+        let url = await driver.getCurrentUrl();
+        return !url.includes("/login") && url.includes("/home");
+      },
+      10000,
+      "Did not reach the home page",
+    );
+
+    // Go to Giftcards
+    let giftCardsLocator = By.css(
+      "a[href='http://localhost/ospos/public/giftcards'], a[href$='/giftcards']",
+    );
+    let giftCardsLink = await driver.wait(
+      until.elementLocated(giftCardsLocator),
+      10000,
+    );
+    await driver.wait(until.elementIsVisible(giftCardsLink), 10000);
+    await driver.executeScript(
+      "arguments[0].scrollIntoView({block: 'center'});",
+      giftCardsLink,
+    );
+    await giftCardsLink.click();
+
+    // Confirm nav
+    await driver.wait(until.urlContains("/giftcards"), 10000);
+
+    let pageContainer = await driver.wait(
+      async () => {
+        let handles = await driver.getAllWindowHandles();
+        if (handles.length === 0) {
+          throw new Error(
+            "Browser window was closed before Gift Cards loaded.",
+          );
+        }
+
+        let candidates = await driver.findElements(
+          By.css("table, #table, .bootstrap-table, main, #content"),
+        );
+        for (let el of candidates) {
+          if (await el.isDisplayed()) {
+            return el;
+          }
+        }
+        return false;
+      },
+      10000,
+      "Gift Cards page content did not become visible",
+    );
+
+    assert.ok(pageContainer, "Gift Cards container not found");
+    let currentUrl = await driver.getCurrentUrl();
+    assert.ok(
+      currentUrl.includes("/giftcards"),
+      `Expected URL to include '/giftcards', got '${currentUrl}'`,
+    );
+
+    console.log(
+      "Navigated to Gift Cards successfully! Current URL:",
+      currentUrl,
+    );
+  } finally {
+    try {
+      let handles = await driver.getAllWindowHandles();
+      if (handles.length > 0) {
+        await driver.quit();
+      }
+    } catch (_) {}
+  }
+}
+
+navigateToGiftCardsTest();
